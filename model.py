@@ -7,7 +7,7 @@ from Code.Losses import OCC_loss, InfoNCELoss
 
 
 
-# 定义合并模型
+
 class MergeModel(nn.Module):
     def __init__(self, dim_features, config1, config2, device):
         super(MergeModel, self).__init__()
@@ -28,7 +28,7 @@ class MergeModel(nn.Module):
         self.center = nn.Parameter(torch.empty(1, config1['hidden_dim'] * config1['num_layers']), requires_grad=True)
         # print(self.center.shape)
         nn.init.normal_(self.center, mean=0, std=0.1)
-        self.center.data = self.center.data.to(device)  # 将 center 参数的数据移动到指定设备
+        self.center.data = self.center.data.to(device) 
 
 
 
