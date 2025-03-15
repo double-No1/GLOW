@@ -1,6 +1,6 @@
 from transformers import BertModel
 import torch.nn as nn
-# 定义一个Bert模型类用于获取embedding
+
 class BertEmbeddingModel(BertModel):
     def __init__(self, config, output_dim=None):
         super().__init__(config)
