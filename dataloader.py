@@ -13,34 +13,27 @@ from torch_geometric.transforms import ToUndirected
 import torch
 import pandas as pd
 
-# 从指定文件夹中读取文本文件并将其转换为数组。参数包括文件夹路径、文件名和数据类型。
+
 def read_file(folder, name, dtype=None):
     path = osp.join(folder, '{}.txt'.format(name))
     return read_txt_array(path, sep=',', dtype=dtype)
 
-# 将数据分割成多个图批次。它根据节点的批次信息重新计算节点切片和边的切片
-# 将一个图数据集分割成多个子图，每个子图包含一组节点和边
+
 def split(data, batch):
-    """
-	PyG util code to create graph batches
-	"""
+  
 
-    #  计算每个子图中节点数量的累积和。
-    #  np.bincount(batch)计算每个子图中节点的数量，然后将其转换为PyTorch张量并计算累积和。
+   
     node_slice = torch.cumsum(torch.from_numpy(np.bincount(batch)), 0)
-    node_slice = torch.cat([torch.tensor([0]), node_slice])  # 在node_slice的开头添加一个0，以便后续计算节点索引的切片。
-
-    row, _ = data.edge_index     #  从数据集中提取边的起始节点索引
-    # 计算每个子图中边数量的累积和。np.bincount(batch[row])计算每个子图中边的数量，然后将其转换为PyTorch张量并计算累积和
+    node_slice = torch.cat([torch.tensor([0]), node_slice]) 
+    row, _ = data.edge_index    
     edge_slice = torch.cumsum(torch.from_numpy(np.bincount(batch[row])), 0)
     edge_slice = torch.cat([torch.tensor([0]), edge_slice])
 
-    # Edge indices should start at zero for every graph.
-    # 调整边的起始节点索引，使其从0开始。这样可以确保每个子图中的边索引都是独立的。
+   
     data.edge_index -= node_slice[batch[row]].unsqueeze(0)
-    data.__num_nodes__ = torch.bincount(batch).tolist()     # 更新数据集中的节点数量信息。
+    data.__num_nodes__ = torch.bincount(batch).tolist()   
 
-    slices = {'edge_index': edge_slice}     # 创建一个字典，用于存储每个子图的节点和边索引切片。
+    slices = {'edge_index': edge_slice}  
     if data.x is not None:
         slices['x'] = node_slice
     if data.edge_attr is not None:
@@ -53,38 +46,36 @@ def split(data, batch):
 
     return data, slices
 
-# 从原始图形数据中创建PyG数据实例。它首先从指定文件夹中加载节点属性、边索引、节点图ID和图标签。
-# 然后，它创建一个PyG数据对象，并将数据分割成多个图批次
+
 def read_graph_data(folder, feature):
     """
 	PyG util code to create PyG data instance from raw graph data
 	"""
 
-    node_attributes = sp.load_npz(folder + f'new_{feature}_feature.npz')    # 从指定的文件夹中加载节点特征矩阵（node_attributes）
-    edge_index = read_file(folder, 'A', torch.long).t()     # 读取边索引矩阵（edge_index），并将其转置
-    # 加载节点所属的图ID（node_graph_id）和图的标签（graph_labels）
+    node_attributes = sp.load_npz(folder + f'new_{feature}_feature.npz')    
+    edge_index = read_file(folder, 'A', torch.long).t()    
+  
     node_graph_id = np.load(folder + 'node_graph_id.npy')
     graph_labels = np.load(folder + 'graph_labels.npy')
-    # 转换为PyTorch张量
+    
     edge_attr = None
     x = torch.from_numpy(node_attributes.todense()).to(torch.float)
     node_graph_id = torch.from_numpy(node_graph_id).to(torch.long)
     y = torch.from_numpy(graph_labels).to(torch.long)
-    _, y = y.unique(sorted=True, return_inverse=True)       # 图标签进行去重并重新编号
+    _, y = y.unique(sorted=True, return_inverse=True)       
 
-    num_nodes = edge_index.max().item() + 1 if x is None else x.size(0)     # 计算图中的节点数量
-    edge_index, edge_attr = add_self_loops(edge_index, edge_attr)   # 为边索引矩阵添加自环。
-    edge_index, edge_attr = coalesce(edge_index, edge_attr, num_nodes, num_nodes)   # 合并重复的边索引和边属性
+    num_nodes = edge_index.max().item() + 1 if x is None else x.size(0)    
+    edge_index, edge_attr = add_self_loops(edge_index, edge_attr)  
+    edge_index, edge_attr = coalesce(edge_index, edge_attr, num_nodes, num_nodes)  
 
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
-    data, slices = split(data, node_graph_id)   # 根据节点所属的图ID将数据分割成多个子图
-
+    data, slices = split(data, node_graph_id)   
     return data, slices
 
-# 自定义的PyTorch Geometric数据集类，继承自InMemoryDataset。它包含了处理和加载图形数据所需的方法和属性
+
 class FNNDataset(InMemoryDataset):
 
-    # 这是类的构造函数，用于初始化数据集对象。它设置了数据集的根目录、名称、特征类型等属性，并加载处理过的数据
+  
     def __init__(self, root, name, feature='spacy', empty=False, transform=None, pre_transform=None, pre_filter=None):
         self.name = name
         self.root = root
@@ -124,8 +115,7 @@ class FNNDataset(InMemoryDataset):
     def download(self):
         raise NotImplementedError('Must indicate valid location of raw data. No download allowed')
 
-    # 用于处理原始图形数据。它首先调用read_graph_data函数来创建PyG数据对象，并根据需要应用预过滤和预转换操作。
-    # 然后，它将处理后的数据保存到磁盘上
+  
     def process(self):
 
         self.data, self.slices = read_graph_data(self.raw_dir, self.feature)
@@ -145,8 +135,8 @@ class FNNDataset(InMemoryDataset):
         labels = self.data.y.numpy()
 
         # Split data based on label
-        train_indices = np.where(labels == 1)[0]  # Assuming label 1 for training 真新闻
-        test_indices = np.where(labels >= 0)[0]   # 全部新闻
+        train_indices = np.where(labels == 1)[0]  
+        test_indices = np.where(labels >= 0)[0]  
 
         # Convert to PyTorch tensors
         self.train_idx = torch.from_numpy(train_indices).to(torch.long)
