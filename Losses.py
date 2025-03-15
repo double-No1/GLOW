@@ -21,33 +21,22 @@ class OCC_loss(nn.Module):
 
 
 
-# 定义 InfoNCE 损失函数
 class InfoNCELoss(nn.Module):
     def __init__(self, temperature=0.07):
         super(InfoNCELoss, self).__init__()
         self.temperature = temperature
 
     def forward(self, features1, features2):
-        """
-        Computes the InfoNCE loss.
-        Args:
-            features1: output of the first model (batch_size, feature_dim)
-            features2: output of the second model (batch_size, feature_dim)
-        Returns:
-            loss: the InfoNCE loss value
-        """
+       
         batch_size = features1.size(0)
 
 
-        # Cosine similarity matrix
         similarity_matrix = torch.mm(features1, features2.T) / self.temperature
 
-        # Mask out same-sample pairs
         mask = torch.eye(batch_size, dtype=torch.bool, device=similarity_matrix.device)
         positives = similarity_matrix[mask].view(batch_size, 1)
         negatives = similarity_matrix[~mask].view(batch_size, -1)
 
-        # Compute InfoNCE loss
         logits = torch.cat([positives, negatives], dim=1)
         labels = torch.zeros(batch_size, dtype=torch.long, device=similarity_matrix.device)
         loss = F.cross_entropy(logits, labels)
